@@ -5,11 +5,11 @@ import { initDraw } from "@/draw";
 import { useEffect, useRef, useState } from "react";
 import { Canvas } from "./Canvas";
 
-export function RoomCanvas({roomId}: {roomId: string}) {
+export function RoomCanvas({ roomId }: { roomId: string }) {
     const [socket, setSocket] = useState<WebSocket | null>(null);
 
     useEffect(() => {
-        const ws = new WebSocket(`${WS_URL}?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3Njg0NDMwYy04YzNiLTRlZmQtOGFmNS00YzQwMzdmNjJkYzMiLCJpYXQiOjE3MzcyOTg2NjV9.xacFop0s231DoUVeLZormeIbBmIRaXftTVVI6weIqFo`)
+        const ws = new WebSocket(`${WS_URL}?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiNjMzOThmMC05ODhlLTQyYTAtODE0Yi00NDU0MmQ4ZThlMTMiLCJpYXQiOjE3Mzc2MTI3MDV9.5-dhDDiFuWFxP8a5CFD65YVWqlLSQ7uyEzkIjqtA6H8`)
 
         ws.onopen = () => {
             setSocket(ws);
@@ -20,9 +20,8 @@ export function RoomCanvas({roomId}: {roomId: string}) {
             console.log(data);
             ws.send(data)
         }
-        
     }, [])
-   
+
     if (!socket) {
         return <div>
             Connecting to server....
