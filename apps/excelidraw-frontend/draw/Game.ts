@@ -7,7 +7,8 @@ type Shape = {
     y: number;
     width: number;
     height: number;
-    backgroundColor: string
+    backgroundColor: string;
+    input: HTMLInputElement
 } | {
     type: "circle";
     centerX: number;
@@ -66,7 +67,7 @@ export class Game {
         this.selectedTool = tool;
     }
 
-    setColor (color : string) {
+    setColor(color: string) {
         this.color = color
     }
 
@@ -86,6 +87,10 @@ export class Game {
             if (message.type == "chat") {
                 const parsedShape = JSON.parse(message.message)
                 if (this.checkIfShapeExists(parsedShape.shape)) this.existingShapes.push(parsedShape.shape)
+                this.clearCanvas();
+            }
+            if (message.type === "update_shapes") {
+                this.existingShapes = message.data
                 this.clearCanvas();
             }
         }
@@ -153,6 +158,7 @@ export class Game {
             for (const shape of this.existingShapes) {
                 if (this.isPointInRect(e.clientX, e.clientY, shape) || this.isPointInCircle(e.clientX, e.clientY, shape)) {
                     this.draggedShape = shape
+                    break
                 }
             }
         }
@@ -160,6 +166,7 @@ export class Game {
             this.eraserPath.push([e.clientX, e.clientY]);
         }
     }
+
     mouseUpHandler = (e: MouseEvent) => {
         this.clicked = false
         const width = e.clientX - this.startX;
@@ -167,15 +174,27 @@ export class Game {
 
         const selectedTool = this.selectedTool;
         let shape: Shape | null = null;
-        if (selectedTool === "rect") {
-
+        if (selectedTool === "rect" && this.startX !== -1 && this.startY !== -1 && width > 10 && height > 10) {
+            const input = document.createElement("input");
+            input.style.position = "absolute"
+            input.style.left = `${this.startX + 5}px`
+            input.style.top = `${this.startY + 5}px`
+            input.style.width = `${width - 5}px`
+            input.style.border = "0"
+            input.style.outline = "none"
+            input.style.alignItems = "center"
+            input.style.border = "none"
+            input.style.backgroundColor = this.color
+            input.style.color = "white"
+            document.body.appendChild(input);
             shape = {
                 type: "rect",
                 x: this.startX,
                 y: this.startY,
                 height,
                 width,
-                backgroundColor: this.color
+                backgroundColor: this.color,
+                input: input
             }
         } else if (selectedTool === "circle") {
             const radius = Math.max(width, height) / 2;
@@ -187,12 +206,37 @@ export class Game {
                 backgroundColor: this.color
             }
         } else if (selectedTool === "eraser") {
-            this.existingShapes = this.existingShapes.filter((shape) => {
-                if (!shape) return false;
-                return !this.eraserPath.some((point) => {
-                    return this.isPointInRect(point[0], point[1], shape) || this.isPointInCircle(point[0], point[1], shape) || this.isPointInLine(point[0], point[1], shape);
-                })
-            })
+            const updatedShapes: Shape[] = [];
+
+            this.existingShapes.map((shape) => {
+                if (!shape) return;
+
+                const isErased = this.eraserPath.some((point) => {
+                    if (shape.type === "rect" && this.isPointInRect(point[0], point[1], shape)) {
+                        if (shape.input && shape.input.parentElement) {
+                            shape.input.parentElement.removeChild(shape.input);
+                        }
+                        return true;
+                    }
+                    if (shape.type === "circle" && this.isPointInCircle(point[0], point[1], shape)) {
+                        return true;
+                    }
+                    if (shape.type === "pencil" && this.isPointInLine(point[0], point[1], shape)) {
+                        return true;
+                    }
+                    return false;
+                });
+
+                if (!isErased) {
+                    updatedShapes.push(shape);
+                }
+            });
+
+            this.existingShapes = updatedShapes;
+            this.socket.send(JSON.stringify({
+                type: "update_shapes",
+                data: this.existingShapes
+            }))
             this.clearCanvas();
         } else if (selectedTool === "pencil") {
             shape = {
@@ -213,19 +257,16 @@ export class Game {
 
         this.eraserPath = []
 
+        this.existingShapes.push(shape);
 
+        this.socket.send(JSON.stringify({
+            type: "chat",
+            message: JSON.stringify({
+                shape
+            }),
+            roomId: this.roomId
+        }))
 
-        if (shape) {
-            this.existingShapes.push(shape);
-
-            this.socket.send(JSON.stringify({
-                type: "chat",
-                message: JSON.stringify({
-                    shape
-                }),
-                roomId: this.roomId
-            }))
-        }
     }
     mouseMoveHandler = (e: MouseEvent) => {
         if (this.clicked) {
@@ -262,10 +303,16 @@ export class Game {
                     const x1 = (2 * e.clientX - this.draggedShape.width) / 2, y1 = (2 * e.clientY - this.draggedShape.height) / 2;
                     this.draggedShape.x = x1
                     this.draggedShape.y = y1
+                    this.draggedShape.input.style.left = `${x1 + 5}px`
+                    this.draggedShape.input.style.top = `${y1 + 5}px`
                 }
                 if (this.draggedShape.type === "circle") {
                     this.draggedShape.centerX = e.clientX, this.draggedShape.centerY = e.clientY;
                 }
+                this.socket.send(JSON.stringify({
+                    type: "update_shapes",
+                    data: this.existingShapes
+                }))
             }
             else if (selectedTool === "eraser") {
                 this.eraserPath.push([e.clientX, e.clientY]);

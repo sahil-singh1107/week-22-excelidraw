@@ -99,6 +99,21 @@ wss.on('connection', function connection(ws, request) {
       })
     }
 
+    if (parsedData.type === "update_shapes") {
+      const roomId = parsedData.roomId;
+      
+      users.forEach(user => {
+        if (user.rooms.includes(roomId)) {
+          user.ws.send(JSON.stringify({
+            type: "update_shapes",
+            data: parsedData.data,
+            roomId
+          }))
+        }
+      })
+
+    }
+
   });
 
 });
